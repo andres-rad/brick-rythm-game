@@ -12,7 +12,7 @@
     * Easy ->   750000
     * Medium -> 500000
     * Hard ->   250000
-* Integrate user promts to UI 
+* Integrate user prompts to UI 
 * New stats: 
     * longest streak
     * notes remaining

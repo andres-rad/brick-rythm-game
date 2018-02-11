@@ -33,24 +33,24 @@ data Stats = Stats
   , _streak   :: Int -- ^ Player note streak
   , _duration :: Int -- ^ Length of game
   , _total    :: Int -- ^ Amount of notes generated
-  }
+  } deriving Show
 
-instance Show Stats where
-  show s = 
-    let 
-      hitsF = fromIntegral $ _hits s
-      missesF = fromIntegral $ _misses s
-      totalF = fromIntegral $ _total s
-      accuracy = hitsF / (hitsF + missesF)
-      hitRate = hitsF / totalF
-    in
-      "Score: " ++ show (_score s)
-       ++ "\nStreak: " ++ show (_streak s) 
-       ++ "\nTotal: " ++ show (_total s)
-       ++ "\nHits: " ++ show (_hits s)
-       ++ "\nMisses: " ++ show (_misses s)
-       ++ "\nAccuracy: " ++ showFFloat (Just 2) (accuracy * 100) "%"
-       ++ "\nHitRate: " ++ showFFloat (Just 2) (hitRate * 100) "%"
+printStats :: Stats -> String
+printStats s = 
+  let 
+    hitsF = fromIntegral $ _hits s
+    missesF = fromIntegral $ _misses s
+    totalF = fromIntegral $ _total s
+    accuracy = hitsF / (hitsF + missesF)
+    hitRate = hitsF / totalF
+  in
+    "Score: " ++ show (_score s)
+     ++ "\nStreak: " ++ show (_streak s) 
+     ++ "\nTotal: " ++ show (_total s)
+     ++ "\nHits: " ++ show (_hits s)
+     ++ "\nMisses: " ++ show (_misses s)
+     ++ "\nAccuracy: " ++ showFFloat (Just 2) (accuracy * 100) "%"
+     ++ "\nHitRate: " ++ showFFloat (Just 2) (hitRate * 100) "%"
   
 
 data Position -- Left, Center Left, Center, Center Right, Right

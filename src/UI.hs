@@ -105,7 +105,7 @@ drawScore s = withBorderStyle BS.unicodeBold
   $ B.borderWithLabel (str "Stats")
   $ C.hCenter
   $ padAll 1
-  $ str $ show s
+  $ str $ printStats s
 
 drawGameOver :: Bool -> Widget Name
 drawGameOver dead =

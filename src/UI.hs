@@ -16,7 +16,7 @@ import Brick
   , padRight, padLeft, padTop, padAll, Padding(..)
   , withBorderStyle
   , str
-  , attrMap, withAttr, emptyWidget, AttrName, on, fg
+  , attrMap, withAttr, emptyWidget, AttrName, on, fg, bg
   , (<+>)
   )
 import Brick.BChan (newBChan, writeBChan)
@@ -37,7 +37,7 @@ data Tick = Tick
 -- | Named resources
 type Name = ()
 
-data Cell = Key | Nota | Empty
+data Cell = Key | Nota Position | Empty
 
 -- App definition
 
@@ -95,7 +95,7 @@ controls :: String
 controls = "trigger keys (left to right): f g h j k\nReset: r\nQuit: q"
 
 drawStats :: Game -> Widget Name
-drawStats g = hLimit 18
+drawStats g = hLimit 20
   $ vBox [ drawScore (g ^. stats)
          , padTop (Pad 2) $ drawGameOver (g ^. dead)
          ]
@@ -115,36 +115,60 @@ drawGameOver dead =
 
 drawGrid :: Game -> Widget Name
 drawGrid g = withBorderStyle BS.unicodeBold
-  $ B.borderWithLabel (str "f|g|h|j|k")
+  $ B.borderWithLabel (str " f| g| h| j| k")
   $ vBox rows
   where
     rows         = [hBox $ cellsInRow r | r <- [height-1,height-2..0]]
     cellsInRow y = [drawCoord (V2 x y) | x <- [0..width-1]]
     drawCoord    = drawCell . cellAt
     cellAt c
-      | elem c $ g ^. notes = Nota
+      | elem c $ g ^. notes = Nota (note2pos c)
       | c `elem` g ^. keys = Key
       | otherwise  = Empty
 
 drawCell :: Cell -> Widget Name
-drawCell Key = withAttr keyAttr cw
-drawCell Nota  = withAttr notaAttr cw
-drawCell Empty = withAttr emptyAttr cw
+drawCell Key = withAttr keyAttr kw
+drawCell (Nota p) = withAttr (getNotaAttr p) cw
+drawCell Empty = withAttr emptyAttr chord
 
 cw :: Widget Name
-cw = str "  "
+cw = str " ◯ "
+
+chord :: Widget Name
+chord = str " : "
+
+kw :: Widget Name
+kw = str "   "
 
 theMap :: AttrMap
 theMap = attrMap V.defAttr
-  [ (keyAttr, V.blue `on` V.blue)
-  , (notaAttr, V.red `on` V.green)
+  [ (keyAttr, bg $ V.white)
+  , (lAttr, bg V.green)
+  , (clAttr, bg V.yellow)
+  , (cAttr, bg V.blue )
+  , (crAttr, bg V.magenta)
+  , (rAttr, bg V.cyan)
   , (gameOverAttr, fg V.red `V.withStyle` V.bold)
   ]
 
 gameOverAttr :: AttrName
 gameOverAttr = "gameOver"
 
-keyAttr, notaAttr, emptyAttr :: AttrName
+getNotaAttr :: Position -> AttrName
+getNotaAttr L = lAttr
+getNotaAttr CL = clAttr
+getNotaAttr C = cAttr
+getNotaAttr CR = crAttr
+getNotaAttr R = rAttr
+
+lAttr, clAttr, cAttr, crAttr, rAttr :: AttrName
+lAttr = "lAttr"
+clAttr = "clAttr"
+cAttr = "cAttr"
+crAttr = "crAttr"
+rAttr = "rAttr"
+
+keyAttr, emptyAttr :: AttrName
 keyAttr = "keyAttr"
-notaAttr = "notaAttr"
 emptyAttr = "emptyAttr"
+

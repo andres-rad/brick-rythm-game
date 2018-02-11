@@ -12,10 +12,11 @@ import Lens.Micro.TH (makeLenses)
 import Lens.Micro ((&), (.~), (%~), (^.))
 import Linear.V2 (V2(..), _x, _y)
 
+import Numeric (showFFloat)
 -- Types
 
 data Game = Game
-  { _keys   :: [Coord]     -- ^coordinates w here you hit the notes 
+  { _keys   :: [Coord]     -- ^coordinates where you hit the notes 
   , _notes  :: Seq Coord   -- ^Position of current notes to hit
   , _stats  :: Stats       -- ^Player stats (score, hit%, etc)
   , _nexts  :: Seq Note    -- ^Stream of random next notes
@@ -27,23 +28,29 @@ data Game = Game
 
 data Stats = Stats 
   { _score    :: Int -- ^ Game Score
-  , _total    :: Int -- ^ Amount of notes generated
+  , _hits     :: Int -- ^ Amount of correct key triggers
+  , _misses   :: Int -- ^ Amount of failed key triggers
   , _streak   :: Int -- ^ Player note streak
   , _duration :: Int -- ^ Length of game
-  , _attempts  :: Int -- ^ # Keys struck by player
+  , _total    :: Int -- ^ Amount of notes generated
   }
 
 instance Show Stats where
   show s = 
     let 
-      attemptsR = fromIntegral $ _attempts s
-      totalR = fromIntegral $ _total s
+      hitsF = fromIntegral $ _hits s
+      missesF = fromIntegral $ _misses s
+      totalF = fromIntegral $ _total s
+      accuracy = hitsF / (hitsF + missesF)
+      hitRate = hitsF / totalF
     in
       "Score: " ++ show (_score s)
        ++ "\nStreak: " ++ show (_streak s) 
        ++ "\nTotal: " ++ show (_total s)
-       ++ "\nHitrate: " ++ show ((totalR / attemptsR) * 100)
-       ++ "%"
+       ++ "\nHits: " ++ show (_hits s)
+       ++ "\nMisses: " ++ show (_misses s)
+       ++ "\nAccuracy: " ++ showFFloat (Just 2) (accuracy * 100) "%"
+       ++ "\nHitRate: " ++ showFFloat (Just 2) (hitRate * 100) "%"
   
 
 data Position -- Left, Center Left, Center, Center Right, Right
@@ -79,12 +86,20 @@ keyHeight = 3
 dec = \x -> x - 1
 
 -- Decides coords of new note given its position
-translatePos :: Position -> Coord
-translatePos p = V2 (fromEnum p) (height - 1)
+pos2note :: Position -> Coord
+pos2note p = V2 (fromEnum p) (height - 1)
 
 -- Translates key position to coord
-translateKey :: Position -> Coord
-translateKey p = V2 (fromEnum p) keyHeight
+pos2key :: Position -> Coord
+pos2key p = V2 (fromEnum p) keyHeight
+
+-- Recovers position from column
+note2pos :: Coord -> Position
+note2pos (V2 0 _) = L
+note2pos (V2 1 _) = CL
+note2pos (V2 2 _) = C
+note2pos (V2 3 _) = CR
+note2pos (V2 4 _) = R
 
 -- | Step forward in time
 step :: Game -> Game
@@ -108,6 +123,7 @@ advanceAll g =
     case missedNote g of
         True ->
             g & (stats . streak) .~ 0
+              & (stats . misses) %~ (+(amtMissed $ g ^. notes))
               & (stats . total) %~ (+(amtMissed $ g ^. notes))
               & notes %~ (\s -> S.filter reachable $ fmap (\p -> p &_y %~ dec) s)
         False ->
@@ -138,23 +154,23 @@ addNote g =
         newCoords n =
           case n of
             Silence -> S.empty
-            Single p -> S.singleton $ translatePos p
-            Interval (p1, p2)  -> S.fromList $ fmap (translatePos) [p1, p2]
-            Chord (p1, p2, p3) -> S.fromList $ fmap (translatePos) [p1, p2, p3]
+            Single p -> S.singleton $ pos2note p
+            Interval (p1, p2)  -> S.fromList $ fmap (pos2note) [p1, p2]
+            Chord (p1, p2, p3) -> S.fromList $ fmap (pos2note) [p1, p2, p3]
 
 -- Trigger a key and checks if it hit a note
 trigger :: Game -> Position -> Game
 trigger g p = 
-  case (translateKey p) `elem` (g ^. notes) of
+  case (pos2key p) `elem` (g ^. notes) of
     True ->
       g & stats . score  %~ (+100)
         & stats . streak %~ (+1)
         & stats . total  %~ (+1)
-        & notes  %~ (S.filter (/= translateKey p))
-        & stats . attempts %~ (+1)
+        & stats . hits %~ (+1)
+        & notes  %~ (S.filter (/= pos2key p))
     False ->
       g & stats . streak .~ 0
-        & stats . attempts %~ (+1)
+        & stats . misses %~ (+1)
 
 ----------------------------------------------------------------
 initGame :: Int -> IO Game
@@ -165,14 +181,16 @@ initGame n = do
           , _total  = 0
           , _streak = 0
           , _duration = sum $ countNotes <$> inf
-          , _attempts = 0
+          , _hits = 0
+          , _misses = 0
           }
   let g = Game 
-            { _keys   = translateKey <$> positions
+            { _keys   = pos2key <$> positions
             , _notes  = S.empty
             , _stats  = s
             , _nexts  = S.fromList inf
-            , _dead = False, _paused = False , _frozen = False }
+            , _dead = False, _paused = False , _frozen = False 
+            }
   return g
   where
     countNotes :: Note -> Int
@@ -213,6 +231,3 @@ nextNote = do
     idx <- randomRIO(0, (length noteClass) - 1)
     jdx <- randomRIO(0, length (noteClass !! idx) - 1)
     return $ noteClass !! idx !! jdx 
-
-fromList :: [a] -> Stream a
-fromList = foldr (:|) (error "Streams must be infinite")
